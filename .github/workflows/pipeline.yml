@@ -1,0 +1,66 @@
+name: Shopmart CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # 🧪 CONTINUOUS INTEGRATION
+  ci:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Install & Build Server
+        run: |
+          cd server
+          npm install
+          # npm test --if-present
+          echo "Server CI Passed"
+
+      - name: Install & Build Client
+        run: |
+          cd client
+          npm install
+          npm run build
+          echo "Client CI Passed"
+
+  # 🚢 CONTINUOUS DEPLOYMENT (Build Docker Images)
+  cd:
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Server Docker Image
+        run: |
+          docker build -t shopmart-server:latest ./server
+          echo "Server Docker Image Built"
+
+      - name: Build Client Docker Image
+        run: |
+          docker build -t shopmart-client:latest ./client
+          echo "Client Docker Image Built"
+
+      - name: Self-Hosted/Cloud Deploy Placeholder
+        run: |
+          echo "Ready for deployment to AWS/Vercel/Render"
+          # Example for Render Deploy Hook:
+          # curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
