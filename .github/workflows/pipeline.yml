@@ -18,24 +18,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: |
-            server/package-lock.json
-            client/package-lock.json
 
       - name: Install & Build Server
+        working-directory: server
         run: |
-          cd server
           npm install
-          # npm test --if-present
-          echo "Server CI Passed"
+          echo "✅ Server CI Passed"
 
       - name: Install & Build Client
+        working-directory: client
         run: |
-          cd client
           npm install
           npm run build
-          echo "Client CI Passed"
+          echo "✅ Client CI Passed"
 
   # 🚢 CONTINUOUS DEPLOYMENT (Build Docker Images)
   cd:
@@ -52,15 +47,15 @@ jobs:
       - name: Build Server Docker Image
         run: |
           docker build -t shopmart-server:latest ./server
-          echo "Server Docker Image Built"
+          echo "✅ Server Docker Image Built"
 
       - name: Build Client Docker Image
         run: |
           docker build -t shopmart-client:latest ./client
-          echo "Client Docker Image Built"
+          echo "✅ Client Docker Image Built"
 
       - name: Self-Hosted/Cloud Deploy Placeholder
         run: |
-          echo "Ready for deployment to AWS/Vercel/Render"
+          echo "🚀 Ready for deployment to AWS/Vercel/Render"
           # Example for Render Deploy Hook:
           # curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
