@@ -44,38 +44,6 @@ jobs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:latest ./server
         docker push $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:latest
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_SERVER:$IMAGE_TAG" >> $GITHUB_OUTPUT
-
-    - name: Deploy Server to App Runner
-      run: |
-        SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='shopmart-server'].ServiceArn" --output text)
-        if [ -z "$SERVICE_ARN" ] || [ "$SERVICE_ARN" == "None" ]; then
-          echo "Creating new App Runner service for Server..."
-          aws apprunner create-service \
-            --service-name shopmart-server \
-            --source-configuration "{
-              \"ImageRepository\": {
-                \"ImageIdentifier\": \"${{ steps.build-server.outputs.image }}\",
-                \"ImageRepositoryType\": \"ECR\",
-                \"ImageConfiguration\": {
-                  \"Port\": \"5001\",
-                  \"RuntimeEnvironmentVariables\": {
-                    \"MONGO_URI\": \"${{ secrets.MONGO_URI }}\",
-                    \"JWT_SECRET\": \"${{ secrets.JWT_SECRET }}\",
-                    \"NODE_ENV\": \"production\"
-                  }
-                }
-              },
-              \"AuthenticationConfiguration\": {
-                \"AccessRoleArn\": \"arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole\"
-              },
-              \"AutoDeploymentsEnabled\": true
-            }" \
-            --instance-configuration "{ \"InstanceRoleArn\": \"arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole\" }"
-        else
-          echo "Updating existing App Runner service for Server..."
-          aws apprunner update-service --service-arn $SERVICE_ARN --source-configuration "{ \"ImageRepository\": { \"ImageIdentifier\": \"${{ steps.build-server.outputs.image }}\", \"ImageRepositoryType\": \"ECR\" } }"
-        fi
 
     # --- CLIENT DEPLOYMENT ---
     - name: Build, tag, and push Client image to Amazon ECR
@@ -87,34 +55,4 @@ jobs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:latest ./client
         docker push $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:latest
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    - name: Deploy Client to App Runner
-      run: |
-        SERVER_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='shopmart-server'].ServiceUrl" --output text)
-        SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='shopmart-client'].ServiceArn" --output text)
-        if [ -z "$SERVICE_ARN" ] || [ "$SERVICE_ARN" == "None" ]; then
-          echo "Creating new App Runner service for Client..."
-          aws apprunner create-service \
-            --service-name shopmart-client \
-            --source-configuration "{
-              \"ImageRepository\": {
-                \"ImageIdentifier\": \"${{ steps.build-client.outputs.image }}\",
-                \"ImageRepositoryType\": \"ECR\",
-                \"ImageConfiguration\": {
-                  \"Port\": \"3000\",
-                  \"RuntimeEnvironmentVariables\": {
-                    \"VITE_API_URL\": \"https://$SERVER_URL/api/v1\"
-                  }
-                }
-              },
-              \"AuthenticationConfiguration\": {
-                \"AccessRoleArn\": \"arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole\"
-              },
-              \"AutoDeploymentsEnabled\": true
-            }" \
-            --instance-configuration "{ \"InstanceRoleArn\": \"arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole\" }"
-        else
-          echo "Updating existing App Runner service for Client..."
-          aws apprunner update-service --service-arn $SERVICE_ARN --source-configuration "{ \"ImageRepository\": { \"ImageIdentifier\": \"${{ steps.build-client.outputs.image }}\", \"ImageRepositoryType\": \"ECR\" } }"
-        fi
