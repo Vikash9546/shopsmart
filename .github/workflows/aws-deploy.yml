@@ -59,18 +59,19 @@ jobs:
                 \"ImageRepositoryType\": \"ECR\",
                 \"ImageConfiguration\": {
                   \"Port\": \"5001\",
-                  \"RuntimeEnvironmentVariables\": [
-                    { \"Name\": \"MONGO_URI\", \"Value\": \"${{ secrets.MONGO_URI }}\" },
-                    { \"Name\": \"JWT_SECRET\", \"Value\": \"${{ secrets.JWT_SECRET }}\" },
-                    { \"Name\": \"NODE_ENV\", \"Value\": \"production\" }
-                  ]
+                  \"RuntimeEnvironmentVariables\": {
+                    \"MONGO_URI\": \"${{ secrets.MONGO_URI }}\",
+                    \"JWT_SECRET\": \"${{ secrets.JWT_SECRET }}\",
+                    \"NODE_ENV\": \"production\"
+                  }
                 }
               },
               \"AuthenticationConfiguration\": {
                 \"AccessRoleArn\": \"arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole\"
               },
               \"AutoDeploymentsEnabled\": true
-            }"
+            }" \
+            --instance-configuration "{ \"InstanceRoleArn\": \"arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole\" }"
         else
           echo "Updating existing App Runner service for Server..."
           aws apprunner update-service --service-arn $SERVICE_ARN --source-configuration "{ \"ImageRepository\": { \"ImageIdentifier\": \"${{ steps.build-server.outputs.image }}\", \"ImageRepositoryType\": \"ECR\" } }"
@@ -102,18 +103,18 @@ jobs:
                 \"ImageRepositoryType\": \"ECR\",
                 \"ImageConfiguration\": {
                   \"Port\": \"3000\",
-                  \"RuntimeEnvironmentVariables\": [
-                    { \"Name\": \"VITE_API_URL\", \"Value\": \"https://$SERVER_URL/api/v1\" }
-                  ]
+                  \"RuntimeEnvironmentVariables\": {
+                    \"VITE_API_URL\": \"https://$SERVER_URL/api/v1\"
+                  }
                 }
               },
               \"AuthenticationConfiguration\": {
                 \"AccessRoleArn\": \"arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole\"
               },
               \"AutoDeploymentsEnabled\": true
-            }"
+            }" \
+            --instance-configuration "{ \"InstanceRoleArn\": \"arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole\" }"
         else
           echo "Updating existing App Runner service for Client..."
           aws apprunner update-service --service-arn $SERVICE_ARN --source-configuration "{ \"ImageRepository\": { \"ImageIdentifier\": \"${{ steps.build-client.outputs.image }}\", \"ImageRepositoryType\": \"ECR\" } }"
         fi
-
