@@ -30,8 +30,13 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
+    - name: Get AWS Account ID
+      id: account-id
+      run: echo "id=$(echo ${{ steps.login-ecr.outputs.registry }} | cut -d'.' -f1)" >> $GITHUB_OUTPUT
+
     # --- SERVER DEPLOYMENT ---
     - name: Build, tag, and push Server image to Amazon ECR
+      id: build-server
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
@@ -39,9 +44,39 @@ jobs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:latest ./server
         docker push $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:latest
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_SERVER:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    - name: Deploy Server to App Runner
+      run: |
+        SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='shopmart-server'].ServiceArn" --output text)
+        if [ -z "$SERVICE_ARN" ] || [ "$SERVICE_ARN" == "None" ]; then
+          echo "Creating new App Runner service for Server..."
+          aws apprunner create-service \
+            --service-name shopmart-server \
+            --source-configuration "{
+              \"ImageRepository\": {
+                \"ImageIdentifier\": \"${{ steps.build-server.outputs.image }}\",
+                \"ImageRepositoryType\": \"ECR\",
+                \"ImageConfiguration\": {
+                  \"Port\": \"5001\",
+                  \"RuntimeEnvironmentVariables\": [
+                    { \"Name\": \"MONGO_URI\", \"Value\": \"${{ secrets.MONGO_URI }}\" },
+                    { \"Name\": \"JWT_SECRET\", \"Value\": \"${{ secrets.JWT_SECRET }}\" },
+                    { \"Name\": \"NODE_ENV\", \"Value\": \"production\" }
+                  ]
+                }
+              },
+              \"AutoDeploymentsEnabled\": true
+            }" \
+            --access-role-arn "arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole"
+        else
+          echo "Updating existing App Runner service for Server..."
+          aws apprunner update-service --service-arn $SERVICE_ARN --source-configuration "{ \"ImageRepository\": { \"ImageIdentifier\": \"${{ steps.build-server.outputs.image }}\", \"ImageRepositoryType\": \"ECR\" } }"
+        fi
 
     # --- CLIENT DEPLOYMENT ---
     - name: Build, tag, and push Client image to Amazon ECR
+      id: build-client
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
@@ -49,7 +84,32 @@ jobs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:latest ./client
         docker push $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:latest
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    # Note: To complete deployment, you should set up AWS App Runner or ECS 
-    # and configure it to pull the 'latest' tag from these ECR repositories.
-    # You can also use 'aws apprunner update-service' here if you have services created.
+    - name: Deploy Client to App Runner
+      run: |
+        SERVER_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='shopmart-server'].ServiceUrl" --output text)
+        SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='shopmart-client'].ServiceArn" --output text)
+        if [ -z "$SERVICE_ARN" ] || [ "$SERVICE_ARN" == "None" ]; then
+          echo "Creating new App Runner service for Client..."
+          aws apprunner create-service \
+            --service-name shopmart-client \
+            --source-configuration "{
+              \"ImageRepository\": {
+                \"ImageIdentifier\": \"${{ steps.build-client.outputs.image }}\",
+                \"ImageRepositoryType\": \"ECR\",
+                \"ImageConfiguration\": {
+                  \"Port\": \"3000\",
+                  \"RuntimeEnvironmentVariables\": [
+                    { \"Name\": \"VITE_API_URL\", \"Value\": \"https://$SERVER_URL/api/v1\" }
+                  ]
+                }
+              },
+              \"AutoDeploymentsEnabled\": true
+            }" \
+            --access-role-arn "arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole"
+        else
+          echo "Updating existing App Runner service for Client..."
+          aws apprunner update-service --service-arn $SERVICE_ARN --source-configuration "{ \"ImageRepository\": { \"ImageIdentifier\": \"${{ steps.build-client.outputs.image }}\", \"ImageRepositoryType\": \"ECR\" } }"
+        fi
+
