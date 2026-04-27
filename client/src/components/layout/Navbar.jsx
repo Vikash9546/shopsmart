@@ -11,7 +11,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector((state) => state.auth);
-  const { cartItems } = useSelector((state) => state.cart || { cartItems: [] });
+  const cartItems = useSelector((state) => state.cart?.items || []);
 
   const handleSearch = (e) => {
     e.preventDefault();

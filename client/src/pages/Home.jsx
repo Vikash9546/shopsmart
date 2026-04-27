@@ -1,16 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import ProductCard from '../components/ui/ProductCard';
 import { motion } from 'framer-motion';
-import { ArrowRight, Zap, ShieldCheck, Truck } from 'lucide-react';
+import { ArrowRight, Zap, ShieldCheck, Truck, Filter } from 'lucide-react';
 
 const Home = () => {
+  const [filters, setFilters] = useState({ title: '', price_min: '', price_max: '', categoryId: '' });
+  const [appliedFilters, setAppliedFilters] = useState({ title: '', price_min: '', price_max: '', categoryId: '' });
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['products'],
+    queryKey: ['products', appliedFilters],
     queryFn: async () => {
-      const { data } = await api.get('/products');
-      return data;
+      const params = {};
+      if (appliedFilters.title) params.search = appliedFilters.title;
+      if (appliedFilters.price_min) params['price[gte]'] = appliedFilters.price_min;
+      if (appliedFilters.price_max) params['price[lte]'] = appliedFilters.price_max;
+      if (appliedFilters.categoryId) params.category = appliedFilters.categoryId;
+
+      const response = await api.get('/products', { params });
+      return response.data.products;
     },
   });
 
@@ -84,14 +93,54 @@ const Home = () => {
 
       {/* Product Feed */}
       <section>
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div>
             <h2 className="text-3xl font-black text-gray-900 tracking-tight">Trending <span className="text-primary-600">Now</span></h2>
             <p className="text-gray-500 font-medium">Curated products specifically chosen for you.</p>
           </div>
-          <button className="text-primary-600 font-bold flex items-center gap-1 hover:gap-2 transition-all">
-            View All <ArrowRight size={18} />
-          </button>
+          
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 items-center bg-white p-2 rounded-2xl border border-gray-100 shadow-sm">
+            <input 
+              type="text" 
+              placeholder="Filter by title..." 
+              className="bg-gray-50 border-none rounded-xl px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-primary-500 outline-none w-full md:w-32 lg:w-48"
+              value={filters.title}
+              onChange={(e) => setFilters({...filters, title: e.target.value})}
+            />
+            <input 
+              type="number" 
+              placeholder="Min ₹" 
+              className="bg-gray-50 border-none rounded-xl px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-primary-500 outline-none w-24"
+              value={filters.price_min}
+              onChange={(e) => setFilters({...filters, price_min: e.target.value})}
+            />
+            <input 
+              type="number" 
+              placeholder="Max ₹" 
+              className="bg-gray-50 border-none rounded-xl px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-primary-500 outline-none w-24"
+              value={filters.price_max}
+              onChange={(e) => setFilters({...filters, price_max: e.target.value})}
+            />
+            <select 
+              className="bg-gray-50 border-none rounded-xl px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-primary-500 outline-none"
+              value={filters.categoryId}
+              onChange={(e) => setFilters({...filters, categoryId: e.target.value})}
+            >
+              <option value="">All Categories</option>
+              <option value="1">Clothes</option>
+              <option value="2">Electronics</option>
+              <option value="3">Furniture</option>
+              <option value="4">Shoes</option>
+              <option value="5">Others</option>
+            </select>
+            <button 
+              onClick={() => setAppliedFilters(filters)} 
+              className="bg-primary-600 text-white rounded-xl px-4 py-2 text-sm font-bold hover:bg-primary-700 transition"
+            >
+              Apply
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -113,8 +162,8 @@ const Home = () => {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {data?.products?.map((product) => (
-              <ProductCard key={product._id} product={product} />
+            {data?.map((product) => (
+              <ProductCard key={product.id || product._id} product={product} />
             ))}
           </div>
         )}
