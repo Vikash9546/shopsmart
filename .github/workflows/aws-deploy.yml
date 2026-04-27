@@ -66,9 +66,11 @@ jobs:
                   ]
                 }
               },
+              \"AuthenticationConfiguration\": {
+                \"AccessRoleArn\": \"arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole\"
+              },
               \"AutoDeploymentsEnabled\": true
-            }" \
-            --access-role-arn "arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole"
+            }"
         else
           echo "Updating existing App Runner service for Server..."
           aws apprunner update-service --service-arn $SERVICE_ARN --source-configuration "{ \"ImageRepository\": { \"ImageIdentifier\": \"${{ steps.build-server.outputs.image }}\", \"ImageRepositoryType\": \"ECR\" } }"
@@ -105,9 +107,11 @@ jobs:
                   ]
                 }
               },
+              \"AuthenticationConfiguration\": {
+                \"AccessRoleArn\": \"arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole\"
+              },
               \"AutoDeploymentsEnabled\": true
-            }" \
-            --access-role-arn "arn:aws:iam::${{ steps.account-id.outputs.id }}:role/LabRole"
+            }"
         else
           echo "Updating existing App Runner service for Client..."
           aws apprunner update-service --service-arn $SERVICE_ARN --source-configuration "{ \"ImageRepository\": { \"ImageIdentifier\": \"${{ steps.build-client.outputs.image }}\", \"ImageRepositoryType\": \"ECR\" } }"
